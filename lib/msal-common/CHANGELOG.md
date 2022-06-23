@@ -1,8 +1,16 @@
 # Change Log - @azure/msal-common
 
-This log was last generated on Mon, 13 Jun 2022 22:28:09 GMT and should not be manually modified.
+This log was last generated on Thu, 23 Jun 2022 23:32:51 GMT and should not be manually modified.
 
 <!-- Start content -->
+
+## 7.1.0
+
+Thu, 23 Jun 2022 23:32:51 GMT
+
+### Minor changes
+
+- Add jwks_uri to Authority, OpenIdConfigResponse, and AuthorityMetadataEntity #4905 (joarroyo@microsoft.com)
 
 ## 7.0.0
 
