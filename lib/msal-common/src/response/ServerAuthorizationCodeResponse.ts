@@ -20,8 +20,9 @@ export type ServerAuthorizationCodeResponse = {
     cloud_instance_host_name?: string;
     cloud_graph_host_name?: string;
     msgraph_host?: string;
+    code_verifier?: string;
     // Error case
-    error?: string,
+    error?: string;
     error_description?: string;
     suberror?: string;
     // Native Account ID

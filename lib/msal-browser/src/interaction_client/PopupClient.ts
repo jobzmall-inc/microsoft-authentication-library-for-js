@@ -113,9 +113,9 @@ export class PopupClient extends StandardInteractionClient {
             );
             const popupWindowAttributes = request.popupWindowAttributes || {};
 
-            // asyncPopups flag is true. Acquires token without first opening popup. Popup will be opened later asynchronously.
+            // asyncPopups flag is true. Acquires code without first opening popup. Popup will be opened later asynchronously.
             if (this.config.system.asyncPopups) {
-                this.logger.verbose("asyncPopups set to true, acquiring token");
+                this.logger.verbose('asyncPopups set to true, acquiring code');
                 // Passes on popup position and dimensions if in request
                 return this.acquireAuthorizationCodePopupAsync(
                     request,
@@ -125,10 +125,10 @@ export class PopupClient extends StandardInteractionClient {
             } else {
                 // asyncPopups flag is set to false. Opens popup before acquiring code.
                 this.logger.verbose(
-                    "asyncPopup set to false, opening popup before acquiring code"
+                    'asyncPopup set to false, opening popup before acquiring code'
                 );
                 const popup = this.openSizedPopup(
-                    "about:blank",
+                    'about:blank',
                     popupName,
                     popupWindowAttributes
                 );
@@ -300,7 +300,7 @@ export class PopupClient extends StandardInteractionClient {
                 this.config.auth.clientId,
                 authCodeRequest
             );
-
+            serverParams.code_verifier = authCodeRequest.codeVerifier;
             return serverParams;
         } catch (e) {
             if (popup) {
