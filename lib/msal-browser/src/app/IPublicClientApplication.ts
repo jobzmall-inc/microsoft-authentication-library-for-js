@@ -3,7 +3,7 @@
  * Licensed under the MIT License.
  */
 
-import { AuthenticationResult, AccountInfo, Logger, PerformanceCallbackFunction } from "@azure/msal-common";
+import { AuthenticationResult, AccountInfo, Logger, PerformanceCallbackFunction, ServerAuthorizationCodeResponse } from '@azure/msal-common';
 import { RedirectRequest } from "../request/RedirectRequest";
 import { PopupRequest } from "../request/PopupRequest";
 import { SilentRequest } from "../request/SilentRequest";
@@ -19,10 +19,17 @@ import { BrowserConfiguration } from "../config/Configuration";
 
 export interface IPublicClientApplication {
     initialize(): Promise<void>;
+    acquireAuthorizeCodePopup(
+        request: PopupRequest
+    ): Promise<ServerAuthorizationCodeResponse>;
     acquireTokenPopup(request: PopupRequest): Promise<AuthenticationResult>;
     acquireTokenRedirect(request: RedirectRequest): Promise<void>;
-    acquireTokenSilent(silentRequest: SilentRequest): Promise<AuthenticationResult>;
-    acquireTokenByCode(request: AuthorizationCodeRequest): Promise<AuthenticationResult>;
+    acquireTokenSilent(
+        silentRequest: SilentRequest
+    ): Promise<AuthenticationResult>;
+    acquireTokenByCode(
+        request: AuthorizationCodeRequest
+    ): Promise<AuthenticationResult>;
     addEventCallback(callback: Function): string | null;
     removeEventCallback(callbackId: string): void;
     addPerformanceCallback(callback: PerformanceCallbackFunction): string;
@@ -54,50 +61,53 @@ export const stubbedPublicClientApplication: IPublicClientApplication = {
     initialize: () => {
         return Promise.reject(BrowserConfigurationAuthError.createStubPcaInstanceCalledError());
     },
+    acquireAuthorizeCodePopup: () => {
+        return Promise.reject(BrowserConfigurationAuthError.createStubPcaInstanceCalledError());
+    },
     acquireTokenPopup: () => {
         return Promise.reject(BrowserConfigurationAuthError.createStubPcaInstanceCalledError());
     },
-    acquireTokenRedirect: () => {	
-        return Promise.reject(BrowserConfigurationAuthError.createStubPcaInstanceCalledError());	
-    },	
-    acquireTokenSilent: () => {	
-        return Promise.reject(BrowserConfigurationAuthError.createStubPcaInstanceCalledError());	
+    acquireTokenRedirect: () => {
+        return Promise.reject(BrowserConfigurationAuthError.createStubPcaInstanceCalledError());
+    },
+    acquireTokenSilent: () => {
+        return Promise.reject(BrowserConfigurationAuthError.createStubPcaInstanceCalledError());
     },
     acquireTokenByCode: () => {
         return Promise.reject(BrowserConfigurationAuthError.createStubPcaInstanceCalledError());
     },
     getAllAccounts: () => {
-        return [];	
-    },	
+        return [];
+    },
     getAccountByHomeId: () => {
         return null;
     },
-    getAccountByUsername: () => {	
-        return null;	
-    },	
+    getAccountByUsername: () => {
+        return null;
+    },
     getAccountByLocalId: () => {
         return null;
     },
-    handleRedirectPromise: () => {	
-        return Promise.reject(BrowserConfigurationAuthError.createStubPcaInstanceCalledError());	
-    },	
-    loginPopup: () => {	
-        return Promise.reject(BrowserConfigurationAuthError.createStubPcaInstanceCalledError());	
-    },	
-    loginRedirect: () => {	
-        return Promise.reject(BrowserConfigurationAuthError.createStubPcaInstanceCalledError());	
-    },	
-    logout: () => {	
-        return Promise.reject(BrowserConfigurationAuthError.createStubPcaInstanceCalledError());	
-    },	
-    logoutRedirect: () => {	
-        return Promise.reject(BrowserConfigurationAuthError.createStubPcaInstanceCalledError());	
+    handleRedirectPromise: () => {
+        return Promise.reject(BrowserConfigurationAuthError.createStubPcaInstanceCalledError());
     },
-    logoutPopup: () => {	
-        return Promise.reject(BrowserConfigurationAuthError.createStubPcaInstanceCalledError());	
+    loginPopup: () => {
+        return Promise.reject(BrowserConfigurationAuthError.createStubPcaInstanceCalledError());
     },
-    ssoSilent: () => {	
-        return Promise.reject(BrowserConfigurationAuthError.createStubPcaInstanceCalledError());	
+    loginRedirect: () => {
+        return Promise.reject(BrowserConfigurationAuthError.createStubPcaInstanceCalledError());
+    },
+    logout: () => {
+        return Promise.reject(BrowserConfigurationAuthError.createStubPcaInstanceCalledError());
+    },
+    logoutRedirect: () => {
+        return Promise.reject(BrowserConfigurationAuthError.createStubPcaInstanceCalledError());
+    },
+    logoutPopup: () => {
+        return Promise.reject(BrowserConfigurationAuthError.createStubPcaInstanceCalledError());
+    },
+    ssoSilent: () => {
+        return Promise.reject(BrowserConfigurationAuthError.createStubPcaInstanceCalledError());
     },
     addEventCallback: () => {
         return null;
@@ -142,3 +152,4 @@ export const stubbedPublicClientApplication: IPublicClientApplication = {
         throw BrowserConfigurationAuthError.createStubPcaInstanceCalledError();
     }
 };
+

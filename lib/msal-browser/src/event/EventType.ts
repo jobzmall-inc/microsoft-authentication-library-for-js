@@ -11,9 +11,12 @@ export enum EventType {
     LOGIN_START = "msal:loginStart",
     LOGIN_SUCCESS = "msal:loginSuccess",
     LOGIN_FAILURE = "msal:loginFailure",
+    ACQUIRE_AUTH_CODE_START = "msal:acquireAuthCodeStart",
     ACQUIRE_TOKEN_START = "msal:acquireTokenStart",
     ACQUIRE_TOKEN_SUCCESS = "msal:acquireTokenSuccess",
+    ACQUIRE_AUTH_CODE_SUCCESS = "msal:acquireAuthCodeSuccess",
     ACQUIRE_TOKEN_FAILURE = "msal:acquireTokenFailure",
+    ACQUIRE_AUTH_CODE_FAILURE = "msal:acquireAuthCodeFailure",
     ACQUIRE_TOKEN_NETWORK_START = "msal:acquireTokenFromNetworkStart",
     SSO_SILENT_START = "msal:ssoSilentStart",
     SSO_SILENT_SUCCESS = "msal:ssoSilentSuccess",
@@ -27,5 +30,6 @@ export enum EventType {
     LOGOUT_START = "msal:logoutStart",
     LOGOUT_SUCCESS = "msal:logoutSuccess",
     LOGOUT_FAILURE = "msal:logoutFailure",
-    LOGOUT_END = "msal:logoutEnd"
+    LOGOUT_END = "msal:logoutEnd",
 }
+

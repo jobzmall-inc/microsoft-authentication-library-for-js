@@ -13,6 +13,7 @@
  * Breaking changes to these APIs will be shipped under a minor version, instead of a major version.
  */
 import * as internals from "./internals";
+import { ServerAuthorizationCodeResponse } from '@azure/msal-common';
 export { internals };
 
 export { PublicClientApplication } from "./app/PublicClientApplication";
@@ -55,6 +56,7 @@ export {
     AccountEntity,
     // Response
     AuthenticationResult,
+    ServerAuthorizationCodeResponse,
     // Error
     AuthError,
     AuthErrorMessage,
@@ -85,8 +87,8 @@ export {
     AzureCloudOptions,
     AuthenticationHeaderParser,
     OIDC_DEFAULT_SCOPES,
-    PerformanceCallbackFunction, 
-    PerformanceEvent, 
+    PerformanceCallbackFunction,
+    PerformanceEvent,
     PerformanceEvents
 } from "@azure/msal-common";
 

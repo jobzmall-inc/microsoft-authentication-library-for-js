@@ -10,6 +10,7 @@ import {
     EndSessionRequest,
     EndSessionPopupRequest,
     AuthenticationResult,
+    ServerAuthorizationCodeResponse,
     RedirectRequest,
     SilentRequest,
     PopupRequest,
@@ -40,6 +41,9 @@ export class MsalService implements IMsalService {
 
     initialize(): Observable<void> {
         return from(this.instance.initialize());
+    }
+    acquireAuthorizeCodePopup(request: PopupRequest): Observable<ServerAuthorizationCodeResponse> {
+        return from(this.instance.acquireAuthorizeCodePopup(request));
     }
     acquireTokenPopup(request: PopupRequest): Observable<AuthenticationResult> {
         return from(this.instance.acquireTokenPopup(request));

@@ -4,7 +4,7 @@
  */
 
 import { CryptoOps } from "../crypto/CryptoOps";
-import { StringUtils, ServerError, InteractionRequiredAuthError, AccountInfo, Constants, INetworkModule, AuthenticationResult, Logger, CommonSilentFlowRequest, ICrypto, DEFAULT_CRYPTO_IMPLEMENTATION, AuthError, PerformanceEvents, PerformanceCallbackFunction, StubPerformanceClient, IPerformanceClient, BaseAuthRequest, PromptValue } from "@azure/msal-common";
+import { StringUtils, ServerError, ServerAuthorizationCodeResponse, InteractionRequiredAuthError, AccountInfo, Constants, INetworkModule, AuthenticationResult, Logger, CommonSilentFlowRequest, ICrypto, DEFAULT_CRYPTO_IMPLEMENTATION, AuthError, PerformanceEvents, PerformanceCallbackFunction, StubPerformanceClient, IPerformanceClient, BaseAuthRequest, PromptValue } from "@azure/msal-common";
 import { BrowserCacheManager, DEFAULT_BROWSER_CACHE_MANAGER } from "../cache/BrowserCacheManager";
 import { BrowserConfiguration, buildConfiguration, Configuration } from "../config/Configuration";
 import { InteractionType, ApiId, BrowserConstants, BrowserCacheLocation, WrapperSKU, TemporaryCacheKeys } from "../utils/BrowserConstants";
@@ -38,7 +38,6 @@ import { NativeTokenRequest } from "../broker/nativeBroker/NativeRequest";
 import { BrowserPerformanceClient } from "../telemetry/BrowserPerformanceClient";
 
 export abstract class ClientApplication {
-
     // Crypto interface implementation
     protected readonly browserCrypto: ICrypto;
 
@@ -66,7 +65,10 @@ export abstract class ClientApplication {
     protected eventHandler: EventHandler;
 
     // Redirect Response Object
-    protected redirectResponse: Map<string, Promise<AuthenticationResult | null>>;
+    protected redirectResponse: Map<
+        string,
+        Promise<AuthenticationResult | null>
+    >;
 
     // Native Extension Provider
     protected nativeExtensionProvider: NativeMessageHandler | undefined;
@@ -109,11 +111,18 @@ export abstract class ClientApplication {
          */
         this.isBrowserEnvironment = typeof window !== "undefined";
         // Set the configuration.
-        this.config = buildConfiguration(configuration, this.isBrowserEnvironment);
+        this.config = buildConfiguration(
+            configuration,
+            this.isBrowserEnvironment
+        );
         this.initialized = false;
 
         // Initialize logger
-        this.logger = new Logger(this.config.system.loggerOptions, name, version);
+        this.logger = new Logger(
+            this.config.system.loggerOptions,
+            name,
+            version
+        );
 
         // Initialize the network module class.
         this.networkClient = this.config.system.networkClient;
@@ -128,22 +137,51 @@ export abstract class ClientApplication {
         this.hybridAuthCodeResponses = new Map();
 
         // Initialize performance client
-        this.performanceClient = this.isBrowserEnvironment ?
-            new BrowserPerformanceClient(this.config.auth.clientId, this.config.auth.authority, this.logger, name, version, this.config.telemetry.application) :
-            new StubPerformanceClient(this.config.auth.clientId, this.config.auth.authority, this.logger, name, version, this.config.telemetry.application);
+        this.performanceClient = this.isBrowserEnvironment
+            ? new BrowserPerformanceClient(
+                  this.config.auth.clientId,
+                  this.config.auth.authority,
+                  this.logger,
+                  name,
+                  version,
+                  this.config.telemetry.application
+              )
+            : new StubPerformanceClient(
+                  this.config.auth.clientId,
+                  this.config.auth.authority,
+                  this.logger,
+                  name,
+                  version,
+                  this.config.telemetry.application
+              );
 
         // Initialize the crypto class.
-        this.browserCrypto = this.isBrowserEnvironment ? new CryptoOps(this.logger, this.performanceClient) : DEFAULT_CRYPTO_IMPLEMENTATION;
+        this.browserCrypto = this.isBrowserEnvironment
+            ? new CryptoOps(this.logger, this.performanceClient)
+            : DEFAULT_CRYPTO_IMPLEMENTATION;
 
         this.eventHandler = new EventHandler(this.logger, this.browserCrypto);
 
         // Initialize the browser storage class.
-        this.browserStorage = this.isBrowserEnvironment ?
-            new BrowserCacheManager(this.config.auth.clientId, this.config.cache, this.browserCrypto, this.logger) :
-            DEFAULT_BROWSER_CACHE_MANAGER(this.config.auth.clientId, this.logger);
+        this.browserStorage = this.isBrowserEnvironment
+            ? new BrowserCacheManager(
+                  this.config.auth.clientId,
+                  this.config.cache,
+                  this.browserCrypto,
+                  this.logger
+              )
+            : DEFAULT_BROWSER_CACHE_MANAGER(
+                  this.config.auth.clientId,
+                  this.logger
+              );
 
         // Initialize the token cache
-        this.tokenCache = new TokenCache(this.config, this.browserStorage, this.logger, this.browserCrypto);
+        this.tokenCache = new TokenCache(
+            this.config,
+            this.browserStorage,
+            this.logger,
+            this.browserCrypto
+        );
     }
 
     /**
@@ -152,13 +190,19 @@ export abstract class ClientApplication {
     async initialize(): Promise<void> {
         this.logger.trace("initialize called");
         if (this.initialized) {
-            this.logger.info("initialize has already been called, exiting early.");
+            this.logger.info(
+                "initialize has already been called, exiting early."
+            );
             return;
         }
         this.eventHandler.emitEvent(EventType.INITIALIZE_START);
         if (this.config.system.allowNativeBroker) {
             try {
-                this.nativeExtensionProvider = await NativeMessageHandler.createProvider(this.logger, this.config.system.nativeBrokerHandshakeTimeout);
+                this.nativeExtensionProvider =
+                    await NativeMessageHandler.createProvider(
+                        this.logger,
+                        this.config.system.nativeBrokerHandshakeTimeout
+                    );
             } catch (e) {
                 this.logger.verbose(e);
             }
@@ -176,10 +220,15 @@ export abstract class ClientApplication {
      * @param hash Hash to process. Defaults to the current value of window.location.hash. Only needs to be provided explicitly if the response to be handled is not contained in the current value.
      * @returns Token response or null. If the return value is null, then no auth redirect was detected.
      */
-    async handleRedirectPromise(hash?: string): Promise<AuthenticationResult | null> {
+    async handleRedirectPromise(
+        hash?: string
+    ): Promise<AuthenticationResult | null> {
         this.logger.verbose("handleRedirectPromise called");
         // Block token acquisition before initialize has been called if native brokering is enabled
-        BrowserUtils.blockNativeBrokerCalledBeforeInitialized(this.config.system.allowNativeBroker, this.initialized);
+        BrowserUtils.blockNativeBrokerCalledBeforeInitialized(
+            this.config.system.allowNativeBroker,
+            this.initialized
+        );
 
         const loggedInAccounts = this.getAllAccounts();
         if (this.isBrowserEnvironment) {
@@ -191,56 +240,129 @@ export abstract class ClientApplication {
             const redirectResponseKey = hash || Constants.EMPTY_STRING;
             let response = this.redirectResponse.get(redirectResponseKey);
             if (typeof response === "undefined") {
-                this.eventHandler.emitEvent(EventType.HANDLE_REDIRECT_START, InteractionType.Redirect);
-                this.logger.verbose("handleRedirectPromise has been called for the first time, storing the promise");
+                this.eventHandler.emitEvent(
+                    EventType.HANDLE_REDIRECT_START,
+                    InteractionType.Redirect
+                );
+                this.logger.verbose(
+                    "handleRedirectPromise has been called for the first time, storing the promise"
+                );
 
-                const request: NativeTokenRequest | null = this.browserStorage.getCachedNativeRequest();
+                const request: NativeTokenRequest | null =
+                    this.browserStorage.getCachedNativeRequest();
                 let redirectResponse: Promise<AuthenticationResult | null>;
-                if (request && NativeMessageHandler.isNativeAvailable(this.config, this.logger, this.nativeExtensionProvider) && this.nativeExtensionProvider && !hash) {
-                    this.logger.trace("handleRedirectPromise - acquiring token from native platform");
-                    const nativeClient = new NativeInteractionClient(this.config, this.browserStorage, this.browserCrypto, this.logger, this.eventHandler, this.navigationClient, ApiId.handleRedirectPromise, this.performanceClient, this.nativeExtensionProvider, request.accountId, request.correlationId);
+                if (
+                    request &&
+                    NativeMessageHandler.isNativeAvailable(
+                        this.config,
+                        this.logger,
+                        this.nativeExtensionProvider
+                    ) &&
+                    this.nativeExtensionProvider &&
+                    !hash
+                ) {
+                    this.logger.trace(
+                        "handleRedirectPromise - acquiring token from native platform"
+                    );
+                    const nativeClient = new NativeInteractionClient(
+                        this.config,
+                        this.browserStorage,
+                        this.browserCrypto,
+                        this.logger,
+                        this.eventHandler,
+                        this.navigationClient,
+                        ApiId.handleRedirectPromise,
+                        this.performanceClient,
+                        this.nativeExtensionProvider,
+                        request.accountId,
+                        request.correlationId
+                    );
                     redirectResponse = nativeClient.handleRedirectPromise();
                 } else {
-                    this.logger.trace("handleRedirectPromise - acquiring token from web flow");
-                    const correlationId = this.browserStorage.getTemporaryCache(TemporaryCacheKeys.CORRELATION_ID, true) || Constants.EMPTY_STRING;
-                    const redirectClient = this.createRedirectClient(correlationId);
-                    redirectResponse = redirectClient.handleRedirectPromise(hash);
+                    this.logger.trace(
+                        "handleRedirectPromise - acquiring token from web flow"
+                    );
+                    const correlationId =
+                        this.browserStorage.getTemporaryCache(
+                            TemporaryCacheKeys.CORRELATION_ID,
+                            true
+                        ) || Constants.EMPTY_STRING;
+                    const redirectClient =
+                        this.createRedirectClient(correlationId);
+                    redirectResponse =
+                        redirectClient.handleRedirectPromise(hash);
                 }
 
-                response = redirectResponse.then((result: AuthenticationResult | null) => {
-                    if (result) {
-                        // Emit login event if number of accounts change
-                        const isLoggingIn = loggedInAccounts.length < this.getAllAccounts().length;
-                        if (isLoggingIn) {
-                            this.eventHandler.emitEvent(EventType.LOGIN_SUCCESS, InteractionType.Redirect, result);
-                            this.logger.verbose("handleRedirectResponse returned result, login success");
-                        } else {
-                            this.eventHandler.emitEvent(EventType.ACQUIRE_TOKEN_SUCCESS, InteractionType.Redirect, result);
-                            this.logger.verbose("handleRedirectResponse returned result, acquire token success");
+                response = redirectResponse
+                    .then((result: AuthenticationResult | null) => {
+                        if (result) {
+                            // Emit login event if number of accounts change
+                            const isLoggingIn =
+                                loggedInAccounts.length <
+                                this.getAllAccounts().length;
+                            if (isLoggingIn) {
+                                this.eventHandler.emitEvent(
+                                    EventType.LOGIN_SUCCESS,
+                                    InteractionType.Redirect,
+                                    result
+                                );
+                                this.logger.verbose(
+                                    "handleRedirectResponse returned result, login success"
+                                );
+                            } else {
+                                this.eventHandler.emitEvent(
+                                    EventType.ACQUIRE_TOKEN_SUCCESS,
+                                    InteractionType.Redirect,
+                                    result
+                                );
+                                this.logger.verbose(
+                                    "handleRedirectResponse returned result, acquire token success"
+                                );
+                            }
                         }
-                    }
-                    this.eventHandler.emitEvent(EventType.HANDLE_REDIRECT_END, InteractionType.Redirect);
+                        this.eventHandler.emitEvent(
+                            EventType.HANDLE_REDIRECT_END,
+                            InteractionType.Redirect
+                        );
 
-                    return result;
-                }).catch((e) => {
-                    // Emit login event if there is an account
-                    if (loggedInAccounts.length > 0) {
-                        this.eventHandler.emitEvent(EventType.ACQUIRE_TOKEN_FAILURE, InteractionType.Redirect, null, e);
-                    } else {
-                        this.eventHandler.emitEvent(EventType.LOGIN_FAILURE, InteractionType.Redirect, null, e);
-                    }
-                    this.eventHandler.emitEvent(EventType.HANDLE_REDIRECT_END, InteractionType.Redirect);
+                        return result;
+                    })
+                    .catch((e) => {
+                        // Emit login event if there is an account
+                        if (loggedInAccounts.length > 0) {
+                            this.eventHandler.emitEvent(
+                                EventType.ACQUIRE_TOKEN_FAILURE,
+                                InteractionType.Redirect,
+                                null,
+                                e
+                            );
+                        } else {
+                            this.eventHandler.emitEvent(
+                                EventType.LOGIN_FAILURE,
+                                InteractionType.Redirect,
+                                null,
+                                e
+                            );
+                        }
+                        this.eventHandler.emitEvent(
+                            EventType.HANDLE_REDIRECT_END,
+                            InteractionType.Redirect
+                        );
 
-                    throw e;
-                });
+                        throw e;
+                    });
                 this.redirectResponse.set(redirectResponseKey, response);
             } else {
-                this.logger.verbose("handleRedirectPromise has been called previously, returning the result from the first call");
+                this.logger.verbose(
+                    "handleRedirectPromise has been called previously, returning the result from the first call"
+                );
             }
 
             return response;
         }
-        this.logger.verbose("handleRedirectPromise returns null, not browser environment");
+        this.logger.verbose(
+            "handleRedirectPromise returns null, not browser environment"
+        );
         return null;
     }
 
@@ -262,34 +384,70 @@ export abstract class ClientApplication {
         // If logged in, emit acquire token events
         const isLoggedIn = this.getAllAccounts().length > 0;
         if (isLoggedIn) {
-            this.eventHandler.emitEvent(EventType.ACQUIRE_TOKEN_START, InteractionType.Redirect, request);
+            this.eventHandler.emitEvent(
+                EventType.ACQUIRE_TOKEN_START,
+                InteractionType.Redirect,
+                request
+            );
         } else {
-            this.eventHandler.emitEvent(EventType.LOGIN_START, InteractionType.Redirect, request);
+            this.eventHandler.emitEvent(
+                EventType.LOGIN_START,
+                InteractionType.Redirect,
+                request
+            );
         }
 
         let result: Promise<void>;
 
         if (this.nativeExtensionProvider && this.canUseNative(request)) {
-            const nativeClient = new NativeInteractionClient(this.config, this.browserStorage, this.browserCrypto, this.logger, this.eventHandler, this.navigationClient, ApiId.acquireTokenRedirect, this.performanceClient, this.nativeExtensionProvider, this.getNativeAccountId(request), request.correlationId);
-            result = nativeClient.acquireTokenRedirect(request).catch((e: AuthError) => {
-                if (e instanceof NativeAuthError && e.isFatal()) {
-                    this.nativeExtensionProvider = undefined; // If extension gets uninstalled during session prevent future requests from continuing to attempt
-                    const redirectClient = this.createRedirectClient(request.correlationId);
-                    return redirectClient.acquireToken(request);
-                }
-                throw e;
-            });
+            const nativeClient = new NativeInteractionClient(
+                this.config,
+                this.browserStorage,
+                this.browserCrypto,
+                this.logger,
+                this.eventHandler,
+                this.navigationClient,
+                ApiId.acquireTokenRedirect,
+                this.performanceClient,
+                this.nativeExtensionProvider,
+                this.getNativeAccountId(request),
+                request.correlationId
+            );
+            result = nativeClient
+                .acquireTokenRedirect(request)
+                .catch((e: AuthError) => {
+                    if (e instanceof NativeAuthError && e.isFatal()) {
+                        this.nativeExtensionProvider = undefined; // If extension gets uninstalled during session prevent future requests from continuing to attempt
+                        const redirectClient = this.createRedirectClient(
+                            request.correlationId
+                        );
+                        return redirectClient.acquireToken(request);
+                    }
+                    throw e;
+                });
         } else {
-            const redirectClient = this.createRedirectClient(request.correlationId);
+            const redirectClient = this.createRedirectClient(
+                request.correlationId
+            );
             result = redirectClient.acquireToken(request);
         }
 
         return result.catch((e) => {
             // If logged in, emit acquire token events
             if (isLoggedIn) {
-                this.eventHandler.emitEvent(EventType.ACQUIRE_TOKEN_FAILURE, InteractionType.Redirect, null, e);
+                this.eventHandler.emitEvent(
+                    EventType.ACQUIRE_TOKEN_FAILURE,
+                    InteractionType.Redirect,
+                    null,
+                    e
+                );
             } else {
-                this.eventHandler.emitEvent(EventType.LOGIN_FAILURE, InteractionType.Redirect, null, e);
+                this.eventHandler.emitEvent(
+                    EventType.LOGIN_FAILURE,
+                    InteractionType.Redirect,
+                    null,
+                    e
+                );
             }
             throw e;
         });
@@ -308,7 +466,10 @@ export abstract class ClientApplication {
      */
     acquireTokenPopup(request: PopupRequest): Promise<AuthenticationResult> {
         const correlationId = this.getRequestCorrelationId(request);
-        const atPopupMeasurement = this.performanceClient.startMeasurement(PerformanceEvents.AcquireTokenPopup, correlationId);
+        const atPopupMeasurement = this.performanceClient.startMeasurement(
+            PerformanceEvents.AcquireTokenPopup,
+            correlationId
+        );
 
         try {
             this.logger.verbose("acquireTokenPopup called", correlationId);
@@ -321,66 +482,196 @@ export abstract class ClientApplication {
         // If logged in, emit acquire token events
         const loggedInAccounts = this.getAllAccounts();
         if (loggedInAccounts.length > 0) {
-            this.eventHandler.emitEvent(EventType.ACQUIRE_TOKEN_START, InteractionType.Popup, request);
+            this.eventHandler.emitEvent(
+                EventType.ACQUIRE_TOKEN_START,
+                InteractionType.Popup,
+                request
+            );
         } else {
-            this.eventHandler.emitEvent(EventType.LOGIN_START, InteractionType.Popup, request);
+            this.eventHandler.emitEvent(
+                EventType.LOGIN_START,
+                InteractionType.Popup,
+                request
+            );
         }
 
         let result: Promise<AuthenticationResult>;
 
         if (this.canUseNative(request)) {
-            result = this.acquireTokenNative(request, ApiId.acquireTokenPopup).then((response) => {
-                this.browserStorage.setInteractionInProgress(false);
-                atPopupMeasurement.endMeasurement({
-                    success: true,
-                    isNativeBroker: true
+            result = this.acquireTokenNative(request, ApiId.acquireTokenPopup)
+                .then((response) => {
+                    this.browserStorage.setInteractionInProgress(false);
+                    atPopupMeasurement.endMeasurement({
+                        success: true,
+                        isNativeBroker: true,
+                    });
+                    atPopupMeasurement.flushMeasurement();
+                    return response;
+                })
+                .catch((e: AuthError) => {
+                    if (e instanceof NativeAuthError && e.isFatal()) {
+                        this.nativeExtensionProvider = undefined; // If extension gets uninstalled during session prevent future requests from continuing to attempt
+                        const popupClient = this.createPopupClient(
+                            request.correlationId
+                        );
+                        return popupClient.acquireToken(request);
+                    }
+                    throw e;
                 });
-                atPopupMeasurement.flushMeasurement();
-                return response;
-            }).catch((e: AuthError) => {
-                if (e instanceof NativeAuthError && e.isFatal()) {
-                    this.nativeExtensionProvider = undefined; // If extension gets uninstalled during session prevent future requests from continuing to attempt
-                    const popupClient = this.createPopupClient(request.correlationId);
-                    return popupClient.acquireToken(request);
-                }
-                throw e;
-            });
         } else {
             const popupClient = this.createPopupClient(request.correlationId);
             result = popupClient.acquireToken(request);
         }
 
-        return result.then((result) => {
-            // If logged in, emit acquire token events
-            const isLoggingIn = loggedInAccounts.length < this.getAllAccounts().length;
-            if (isLoggingIn) {
-                this.eventHandler.emitEvent(EventType.LOGIN_SUCCESS, InteractionType.Popup, result);
-            } else {
-                this.eventHandler.emitEvent(EventType.ACQUIRE_TOKEN_SUCCESS, InteractionType.Popup, result);
-            }
+        return result
+            .then((result) => {
+                // If logged in, emit acquire token events
+                const isLoggingIn =
+                    loggedInAccounts.length < this.getAllAccounts().length;
+                if (isLoggingIn) {
+                    this.eventHandler.emitEvent(
+                        EventType.LOGIN_SUCCESS,
+                        InteractionType.Popup,
+                        result
+                    );
+                } else {
+                    this.eventHandler.emitEvent(
+                        EventType.ACQUIRE_TOKEN_SUCCESS,
+                        InteractionType.Popup,
+                        result
+                    );
+                }
 
-            atPopupMeasurement.endMeasurement({
-                success: true
+                atPopupMeasurement.endMeasurement({
+                    success: true,
+                });
+                atPopupMeasurement.flushMeasurement();
+                return result;
+            })
+            .catch((e: AuthError) => {
+                if (loggedInAccounts.length > 0) {
+                    this.eventHandler.emitEvent(
+                        EventType.ACQUIRE_TOKEN_FAILURE,
+                        InteractionType.Popup,
+                        null,
+                        e
+                    );
+                } else {
+                    this.eventHandler.emitEvent(
+                        EventType.LOGIN_FAILURE,
+                        InteractionType.Popup,
+                        null,
+                        e
+                    );
+                }
+
+                atPopupMeasurement.endMeasurement({
+                    errorCode: e.errorCode,
+                    subErrorCode: e.subError,
+                    success: false,
+                });
+                atPopupMeasurement.flushMeasurement();
+
+                // Since this function is syncronous we need to reject
+                return Promise.reject(e);
             });
-            atPopupMeasurement.flushMeasurement();
-            return result;
-        }).catch((e: AuthError) => {
-            if (loggedInAccounts.length > 0) {
-                this.eventHandler.emitEvent(EventType.ACQUIRE_TOKEN_FAILURE, InteractionType.Popup, null, e);
-            } else {
-                this.eventHandler.emitEvent(EventType.LOGIN_FAILURE, InteractionType.Popup, null, e);
-            }
+    }
 
-            atPopupMeasurement.endMeasurement({
-                errorCode: e.errorCode,
-                subErrorCode: e.subError,
-                success: false
-            });
-            atPopupMeasurement.flushMeasurement();
+    /**
+     * Use when you want to obtain an access_token for your API via opening a popup window in the user's browser
+     *
+     * @param request
+     *
+     * @returns A promise that is fulfilled when this function has completed, or rejected if an error was raised.
+     */
+    acquireAuthorizeCodePopup(
+        request: PopupRequest
+    ): Promise<ServerAuthorizationCodeResponse> {
+        const correlationId = this.getRequestCorrelationId(request);
+        const atPopupMeasurement = this.performanceClient.startMeasurement(
+            PerformanceEvents.AcquireTokenPopup,
+            correlationId
+        );
 
+        try {
+            this.logger.verbose("acquireTokenPopup called", correlationId);
+            this.preflightBrowserEnvironmentCheck(InteractionType.Popup);
+        } catch (e) {
             // Since this function is syncronous we need to reject
             return Promise.reject(e);
-        });
+        }
+
+        // If logged in, emit acquire code events
+        const loggedInAccounts = this.getAllAccounts();
+        if (loggedInAccounts.length > 0) {
+            this.eventHandler.emitEvent(
+                EventType.ACQUIRE_AUTH_CODE_START,
+                InteractionType.Popup,
+                request
+            );
+        } else {
+            this.eventHandler.emitEvent(
+                EventType.LOGIN_START,
+                InteractionType.Popup,
+                request
+            );
+        }
+
+        const popupClient = this.createPopupClient(request.correlationId);
+        const result = popupClient.acquireAuthorizeCode(request);
+
+        return result
+            .then((result) => {
+                // If logged in, emit acquire token events
+                const isLoggingIn =
+                    loggedInAccounts.length < this.getAllAccounts().length;
+                if (isLoggingIn) {
+                    this.eventHandler.emitEvent(
+                        EventType.LOGIN_SUCCESS,
+                        InteractionType.Popup,
+                        result
+                    );
+                } else {
+                    this.eventHandler.emitEvent(
+                        EventType.ACQUIRE_AUTH_CODE_SUCCESS,
+                        InteractionType.Popup,
+                        result
+                    );
+                }
+
+                atPopupMeasurement.endMeasurement({
+                    success: true,
+                });
+                atPopupMeasurement.flushMeasurement();
+                return result;
+            })
+            .catch((e: AuthError) => {
+                if (loggedInAccounts.length > 0) {
+                    this.eventHandler.emitEvent(
+                        EventType.ACQUIRE_AUTH_CODE_FAILURE,
+                        InteractionType.Popup,
+                        null,
+                        e
+                    );
+                } else {
+                    this.eventHandler.emitEvent(
+                        EventType.LOGIN_FAILURE,
+                        InteractionType.Popup,
+                        null,
+                        e
+                    );
+                }
+
+                atPopupMeasurement.endMeasurement({
+                    errorCode: e.errorCode,
+                    subErrorCode: e.subError,
+                    success: false,
+                });
+                atPopupMeasurement.flushMeasurement();
+
+                // Since this function is syncronous we need to reject
+                return Promise.reject(e);
+            });
     }
 
     // #endregion
@@ -407,48 +698,73 @@ export abstract class ClientApplication {
         const validRequest = {
             ...request,
             prompt: PromptValue.NONE,
-            correlationId: correlationId
+            correlationId: correlationId,
         };
         this.preflightBrowserEnvironmentCheck(InteractionType.Silent);
-        const ssoSilentMeasurement = this.performanceClient.startMeasurement(PerformanceEvents.SsoSilent, correlationId);
+        const ssoSilentMeasurement = this.performanceClient.startMeasurement(
+            PerformanceEvents.SsoSilent,
+            correlationId
+        );
         this.logger.verbose("ssoSilent called", correlationId);
-        this.eventHandler.emitEvent(EventType.SSO_SILENT_START, InteractionType.Silent, validRequest);
+        this.eventHandler.emitEvent(
+            EventType.SSO_SILENT_START,
+            InteractionType.Silent,
+            validRequest
+        );
 
         let result: Promise<AuthenticationResult>;
 
         if (this.canUseNative(validRequest)) {
-            result = this.acquireTokenNative(validRequest, ApiId.ssoSilent).catch((e: AuthError) => {
+            result = this.acquireTokenNative(
+                validRequest,
+                ApiId.ssoSilent
+            ).catch((e: AuthError) => {
                 // If native token acquisition fails for availability reasons fallback to standard flow
                 if (e instanceof NativeAuthError && e.isFatal()) {
                     this.nativeExtensionProvider = undefined; // If extension gets uninstalled during session prevent future requests from continuing to attempt
-                    const silentIframeClient = this.createSilentIframeClient(validRequest.correlationId);
+                    const silentIframeClient = this.createSilentIframeClient(
+                        validRequest.correlationId
+                    );
                     return silentIframeClient.acquireToken(validRequest);
                 }
                 throw e;
             });
         } else {
-            const silentIframeClient = this.createSilentIframeClient(validRequest.correlationId);
+            const silentIframeClient = this.createSilentIframeClient(
+                validRequest.correlationId
+            );
             result = silentIframeClient.acquireToken(validRequest);
         }
 
-        return result.then((response) => {
-            this.eventHandler.emitEvent(EventType.SSO_SILENT_SUCCESS, InteractionType.Silent, response);
-            ssoSilentMeasurement.endMeasurement({
-                success: true,
-                isNativeBroker: response.fromNativeBroker
+        return result
+            .then((response) => {
+                this.eventHandler.emitEvent(
+                    EventType.SSO_SILENT_SUCCESS,
+                    InteractionType.Silent,
+                    response
+                );
+                ssoSilentMeasurement.endMeasurement({
+                    success: true,
+                    isNativeBroker: response.fromNativeBroker,
+                });
+                ssoSilentMeasurement.flushMeasurement();
+                return response;
+            })
+            .catch((e: AuthError) => {
+                this.eventHandler.emitEvent(
+                    EventType.SSO_SILENT_FAILURE,
+                    InteractionType.Silent,
+                    null,
+                    e
+                );
+                ssoSilentMeasurement.endMeasurement({
+                    errorCode: e.errorCode,
+                    subErrorCode: e.subError,
+                    success: false,
+                });
+                ssoSilentMeasurement.flushMeasurement();
+                throw e;
             });
-            ssoSilentMeasurement.flushMeasurement();
-            return response;
-        }).catch ((e: AuthError) => {
-            this.eventHandler.emitEvent(EventType.SSO_SILENT_FAILURE, InteractionType.Silent, null, e);
-            ssoSilentMeasurement.endMeasurement({
-                errorCode: e.errorCode,
-                subErrorCode: e.subError,
-                success: false
-            });
-            ssoSilentMeasurement.flushMeasurement();
-            throw e;
-        });
     }
 
     /**
@@ -461,56 +777,84 @@ export abstract class ClientApplication {
      * @param request {@link AuthorizationCodeRequest}
      * @returns A promise that is fulfilled when this function has completed, or rejected if an error was raised.
      */
-    async acquireTokenByCode(request: AuthorizationCodeRequest): Promise<AuthenticationResult> {
+    async acquireTokenByCode(
+        request: AuthorizationCodeRequest
+    ): Promise<AuthenticationResult> {
         const correlationId = this.getRequestCorrelationId(request);
         this.preflightBrowserEnvironmentCheck(InteractionType.Silent);
         this.logger.trace("acquireTokenByCode called", correlationId);
-        this.eventHandler.emitEvent(EventType.ACQUIRE_TOKEN_BY_CODE_START, InteractionType.Silent, request);
-        const atbcMeasurement = this.performanceClient.startMeasurement(PerformanceEvents.AcquireTokenByCode, request.correlationId);
+        this.eventHandler.emitEvent(
+            EventType.ACQUIRE_TOKEN_BY_CODE_START,
+            InteractionType.Silent,
+            request
+        );
+        const atbcMeasurement = this.performanceClient.startMeasurement(
+            PerformanceEvents.AcquireTokenByCode,
+            request.correlationId
+        );
 
         try {
             if (request.code) {
                 const hybridAuthCode = request.code;
                 let response = this.hybridAuthCodeResponses.get(hybridAuthCode);
                 if (!response) {
-                    this.logger.verbose("Initiating new acquireTokenByCode request", correlationId);
+                    this.logger.verbose(
+                        "Initiating new acquireTokenByCode request",
+                        correlationId
+                    );
                     response = this.acquireTokenByCodeAsync({
                         ...request,
-                        correlationId
+                        correlationId,
                     })
                         .then((result: AuthenticationResult) => {
-                            this.eventHandler.emitEvent(EventType.ACQUIRE_TOKEN_BY_CODE_SUCCESS, InteractionType.Silent, result);
+                            this.eventHandler.emitEvent(
+                                EventType.ACQUIRE_TOKEN_BY_CODE_SUCCESS,
+                                InteractionType.Silent,
+                                result
+                            );
                             this.hybridAuthCodeResponses.delete(hybridAuthCode);
                             atbcMeasurement.endMeasurement({
                                 success: true,
-                                isNativeBroker: result.fromNativeBroker
+                                isNativeBroker: result.fromNativeBroker,
                             });
                             atbcMeasurement.flushMeasurement();
                             return result;
                         })
                         .catch((error: AuthError) => {
                             this.hybridAuthCodeResponses.delete(hybridAuthCode);
-                            this.eventHandler.emitEvent(EventType.ACQUIRE_TOKEN_BY_CODE_FAILURE, InteractionType.Silent, null, error);
+                            this.eventHandler.emitEvent(
+                                EventType.ACQUIRE_TOKEN_BY_CODE_FAILURE,
+                                InteractionType.Silent,
+                                null,
+                                error
+                            );
                             atbcMeasurement.endMeasurement({
                                 errorCode: error.errorCode,
                                 subErrorCode: error.subError,
-                                success: false
+                                success: false,
                             });
                             atbcMeasurement.flushMeasurement();
                             throw error;
                         });
                     this.hybridAuthCodeResponses.set(hybridAuthCode, response);
                 } else {
-                    this.logger.verbose("Existing acquireTokenByCode request found", request.correlationId);
+                    this.logger.verbose(
+                        "Existing acquireTokenByCode request found",
+                        request.correlationId
+                    );
                     atbcMeasurement.endMeasurement({
-                        success: true
+                        success: true,
                     });
                     atbcMeasurement.discardMeasurement();
                 }
                 return response;
             } else if (request.nativeAccountId) {
                 if (this.canUseNative(request, request.nativeAccountId)) {
-                    return this.acquireTokenNative(request, ApiId.acquireTokenByCode, request.nativeAccountId).catch((e: AuthError) => {
+                    return this.acquireTokenNative(
+                        request,
+                        ApiId.acquireTokenByCode,
+                        request.nativeAccountId
+                    ).catch((e: AuthError) => {
                         // If native token acquisition fails for availability reasons fallback to standard flow
                         if (e instanceof NativeAuthError && e.isFatal()) {
                             this.nativeExtensionProvider = undefined; // If extension gets uninstalled during session prevent future requests from continuing to attempt
@@ -523,13 +867,18 @@ export abstract class ClientApplication {
             } else {
                 throw BrowserAuthError.createAuthCodeOrNativeAccountIdRequiredError();
             }
-
         } catch (e) {
-            this.eventHandler.emitEvent(EventType.ACQUIRE_TOKEN_BY_CODE_FAILURE, InteractionType.Silent, null, e);
+            this.eventHandler.emitEvent(
+                EventType.ACQUIRE_TOKEN_BY_CODE_FAILURE,
+                InteractionType.Silent,
+                null,
+                e
+            );
             atbcMeasurement.endMeasurement({
-                errorCode: e instanceof AuthError && e.errorCode || undefined,
-                subErrorCode: e instanceof AuthError && e.subError || undefined,
-                success: false
+                errorCode: (e instanceof AuthError && e.errorCode) || undefined,
+                subErrorCode:
+                    (e instanceof AuthError && e.subError) || undefined,
+                success: false,
             });
             throw e;
         }
@@ -540,10 +889,19 @@ export abstract class ClientApplication {
      * @param request
      * @returns Result of the operation to redeem the authorization code
      */
-    private async acquireTokenByCodeAsync(request: AuthorizationCodeRequest): Promise<AuthenticationResult> {
-        this.logger.trace("acquireTokenByCodeAsync called", request.correlationId);
-        const silentAuthCodeClient = this.createSilentAuthCodeClient(request.correlationId);
-        const silentTokenResult = await silentAuthCodeClient.acquireToken(request);
+    private async acquireTokenByCodeAsync(
+        request: AuthorizationCodeRequest
+    ): Promise<AuthenticationResult> {
+        this.logger.trace(
+            "acquireTokenByCodeAsync called",
+            request.correlationId
+        );
+        const silentAuthCodeClient = this.createSilentAuthCodeClient(
+            request.correlationId
+        );
+        const silentTokenResult = await silentAuthCodeClient.acquireToken(
+            request
+        );
         return silentTokenResult;
     }
 
@@ -558,35 +916,59 @@ export abstract class ClientApplication {
      * To renew idToken, please pass clientId as the only scope in the Authentication Parameters
      * @returns A promise that is fulfilled when this function has completed, or rejected if an error was raised.
      */
-    protected async acquireTokenByRefreshToken(request: CommonSilentFlowRequest): Promise<AuthenticationResult> {
+    protected async acquireTokenByRefreshToken(
+        request: CommonSilentFlowRequest
+    ): Promise<AuthenticationResult> {
         // block the reload if it occurred inside a hidden iframe
         BrowserUtils.blockReloadInHiddenIframes();
-        const atbrtMeasurement = this.performanceClient.startMeasurement(PerformanceEvents.AcquireTokenByRefreshToken, request.correlationId);
-        this.eventHandler.emitEvent(EventType.ACQUIRE_TOKEN_NETWORK_START, InteractionType.Silent, request);
+        const atbrtMeasurement = this.performanceClient.startMeasurement(
+            PerformanceEvents.AcquireTokenByRefreshToken,
+            request.correlationId
+        );
+        this.eventHandler.emitEvent(
+            EventType.ACQUIRE_TOKEN_NETWORK_START,
+            InteractionType.Silent,
+            request
+        );
 
-        const silentRefreshClient = this.createSilentRefreshClient(request.correlationId);
+        const silentRefreshClient = this.createSilentRefreshClient(
+            request.correlationId
+        );
 
-        return silentRefreshClient.acquireToken(request)
+        return silentRefreshClient
+            .acquireToken(request)
             .then((result: AuthenticationResult) => {
                 atbrtMeasurement.endMeasurement({
                     success: true,
-                    fromCache: result.fromCache
+                    fromCache: result.fromCache,
                 });
                 return result;
             })
-            .catch(e => {
+            .catch((e) => {
                 const isServerError = e instanceof ServerError;
-                const isInteractionRequiredError = e instanceof InteractionRequiredAuthError;
-                const isInvalidGrantError = (e.errorCode === BrowserConstants.INVALID_GRANT_ERROR);
-                if (isServerError && isInvalidGrantError && !isInteractionRequiredError) {
-                    this.logger.verbose("Refresh token expired or invalid, attempting acquire token by iframe", request.correlationId);
+                const isInteractionRequiredError =
+                    e instanceof InteractionRequiredAuthError;
+                const isInvalidGrantError =
+                    e.errorCode === BrowserConstants.INVALID_GRANT_ERROR;
+                if (
+                    isServerError &&
+                    isInvalidGrantError &&
+                    !isInteractionRequiredError
+                ) {
+                    this.logger.verbose(
+                        "Refresh token expired or invalid, attempting acquire token by iframe",
+                        request.correlationId
+                    );
 
-                    const silentIframeClient = this.createSilentIframeClient(request.correlationId);
-                    return silentIframeClient.acquireToken(request)
+                    const silentIframeClient = this.createSilentIframeClient(
+                        request.correlationId
+                    );
+                    return silentIframeClient
+                        .acquireToken(request)
                         .then((result: AuthenticationResult) => {
                             atbrtMeasurement.endMeasurement({
                                 success: true,
-                                fromCache: result.fromCache
+                                fromCache: result.fromCache,
                             });
 
                             return result;
@@ -595,13 +977,13 @@ export abstract class ClientApplication {
                             atbrtMeasurement.endMeasurement({
                                 errorCode: error.errorCode,
                                 subErrorCode: error.subError,
-                                success: false
+                                success: false,
                             });
                             throw error;
                         });
                 }
                 atbrtMeasurement.endMeasurement({
-                    success: false
+                    success: false,
                 });
                 throw e;
             });
@@ -618,10 +1000,13 @@ export abstract class ClientApplication {
      */
     async logout(logoutRequest?: EndSessionRequest): Promise<void> {
         const correlationId = this.getRequestCorrelationId(logoutRequest);
-        this.logger.warning("logout API is deprecated and will be removed in msal-browser v3.0.0. Use logoutRedirect instead.", correlationId);
+        this.logger.warning(
+            "logout API is deprecated and will be removed in msal-browser v3.0.0. Use logoutRedirect instead.",
+            correlationId
+        );
         return this.logoutRedirect({
             correlationId,
-            ...logoutRequest
+            ...logoutRequest,
         });
     }
 
@@ -643,7 +1028,7 @@ export abstract class ClientApplication {
      * @param logoutRequest
      */
     logoutPopup(logoutRequest?: EndSessionPopupRequest): Promise<void> {
-        try{
+        try {
             const correlationId = this.getRequestCorrelationId(logoutRequest);
             this.preflightBrowserEnvironmentCheck(InteractionType.Popup);
             const popupClient = this.createPopupClient(correlationId);
@@ -666,7 +1051,9 @@ export abstract class ClientApplication {
      */
     getAllAccounts(): AccountInfo[] {
         this.logger.verbose("getAllAccounts called");
-        return this.isBrowserEnvironment ? this.browserStorage.getAllAccounts() : [];
+        return this.isBrowserEnvironment
+            ? this.browserStorage.getAllAccounts()
+            : [];
     }
 
     /**
@@ -677,14 +1064,28 @@ export abstract class ClientApplication {
      * @param userName
      * @returns The account object stored in MSAL
      */
-    getAccountByUsername(userName: string): AccountInfo|null {
+    getAccountByUsername(userName: string): AccountInfo | null {
         const allAccounts = this.getAllAccounts();
-        if (!StringUtils.isEmpty(userName) && allAccounts && allAccounts.length) {
+        if (
+            !StringUtils.isEmpty(userName) &&
+            allAccounts &&
+            allAccounts.length
+        ) {
             this.logger.verbose("Account matching username found, returning");
-            this.logger.verbosePii(`Returning signed-in accounts matching username: ${userName}`);
-            return allAccounts.filter(accountObj => accountObj.username.toLowerCase() === userName.toLowerCase())[0] || null;
+            this.logger.verbosePii(
+                `Returning signed-in accounts matching username: ${userName}`
+            );
+            return (
+                allAccounts.filter(
+                    (accountObj) =>
+                        accountObj.username.toLowerCase() ===
+                        userName.toLowerCase()
+                )[0] || null
+            );
         } else {
-            this.logger.verbose("getAccountByUsername: No matching account found, returning null");
+            this.logger.verbose(
+                "getAccountByUsername: No matching account found, returning null"
+            );
             return null;
         }
     }
@@ -696,14 +1097,28 @@ export abstract class ClientApplication {
      * @param homeAccountId
      * @returns The account object stored in MSAL
      */
-    getAccountByHomeId(homeAccountId: string): AccountInfo|null {
+    getAccountByHomeId(homeAccountId: string): AccountInfo | null {
         const allAccounts = this.getAllAccounts();
-        if (!StringUtils.isEmpty(homeAccountId) && allAccounts && allAccounts.length) {
-            this.logger.verbose("Account matching homeAccountId found, returning");
-            this.logger.verbosePii(`Returning signed-in accounts matching homeAccountId: ${homeAccountId}`);
-            return allAccounts.filter(accountObj => accountObj.homeAccountId === homeAccountId)[0] || null;
+        if (
+            !StringUtils.isEmpty(homeAccountId) &&
+            allAccounts &&
+            allAccounts.length
+        ) {
+            this.logger.verbose(
+                "Account matching homeAccountId found, returning"
+            );
+            this.logger.verbosePii(
+                `Returning signed-in accounts matching homeAccountId: ${homeAccountId}`
+            );
+            return (
+                allAccounts.filter(
+                    (accountObj) => accountObj.homeAccountId === homeAccountId
+                )[0] || null
+            );
         } else {
-            this.logger.verbose("getAccountByHomeId: No matching account found, returning null");
+            this.logger.verbose(
+                "getAccountByHomeId: No matching account found, returning null"
+            );
             return null;
         }
     }
@@ -717,12 +1132,26 @@ export abstract class ClientApplication {
      */
     getAccountByLocalId(localAccountId: string): AccountInfo | null {
         const allAccounts = this.getAllAccounts();
-        if (!StringUtils.isEmpty(localAccountId) && allAccounts && allAccounts.length) {
-            this.logger.verbose("Account matching localAccountId found, returning");
-            this.logger.verbosePii(`Returning signed-in accounts matching localAccountId: ${localAccountId}`);
-            return allAccounts.filter(accountObj => accountObj.localAccountId === localAccountId)[0] || null;
+        if (
+            !StringUtils.isEmpty(localAccountId) &&
+            allAccounts &&
+            allAccounts.length
+        ) {
+            this.logger.verbose(
+                "Account matching localAccountId found, returning"
+            );
+            this.logger.verbosePii(
+                `Returning signed-in accounts matching localAccountId: ${localAccountId}`
+            );
+            return (
+                allAccounts.filter(
+                    (accountObj) => accountObj.localAccountId === localAccountId
+                )[0] || null
+            );
         } else {
-            this.logger.verbose("getAccountByLocalId: No matching account found, returning null");
+            this.logger.verbose(
+                "getAccountByLocalId: No matching account found, returning null"
+            );
             return null;
         }
     }
@@ -745,7 +1174,7 @@ export abstract class ClientApplication {
     // #endregion
 
     // #region Helpers
-    
+
     /**
      * Helper to validate app environment before making an auth request
      *
@@ -753,13 +1182,19 @@ export abstract class ClientApplication {
      * @param {InteractionType} interactionType What kind of interaction is being used
      * @param {boolean} [setInteractionInProgress=true] Whether to set interaction in progress temp cache flag
      */
-    protected preflightBrowserEnvironmentCheck(interactionType: InteractionType, setInteractionInProgress: boolean = true): void {
+    protected preflightBrowserEnvironmentCheck(
+        interactionType: InteractionType,
+        setInteractionInProgress: boolean = true
+    ): void {
         this.logger.verbose("preflightBrowserEnvironmentCheck started");
         // Block request if not in browser environment
         BrowserUtils.blockNonBrowserEnvironment(this.isBrowserEnvironment);
 
         // Block redirects if in an iframe
-        BrowserUtils.blockRedirectInIframe(interactionType, this.config.system.allowRedirectInIframe);
+        BrowserUtils.blockRedirectInIframe(
+            interactionType,
+            this.config.system.allowRedirectInIframe
+        );
 
         // Block auth requests inside a hidden iframe
         BrowserUtils.blockReloadInHiddenIframes();
@@ -768,28 +1203,41 @@ export abstract class ClientApplication {
         BrowserUtils.blockAcquireTokenInPopups();
 
         // Block token acquisition before initialize has been called if native brokering is enabled
-        BrowserUtils.blockNativeBrokerCalledBeforeInitialized(this.config.system.allowNativeBroker, this.initialized);
+        BrowserUtils.blockNativeBrokerCalledBeforeInitialized(
+            this.config.system.allowNativeBroker,
+            this.initialized
+        );
 
         // Block redirects if memory storage is enabled but storeAuthStateInCookie is not
-        if (interactionType === InteractionType.Redirect &&
-            this.config.cache.cacheLocation === BrowserCacheLocation.MemoryStorage &&
-            !this.config.cache.storeAuthStateInCookie) {
+        if (
+            interactionType === InteractionType.Redirect &&
+            this.config.cache.cacheLocation ===
+                BrowserCacheLocation.MemoryStorage &&
+            !this.config.cache.storeAuthStateInCookie
+        ) {
             throw BrowserConfigurationAuthError.createInMemoryRedirectUnavailableError();
         }
 
-        if (interactionType === InteractionType.Redirect || interactionType === InteractionType.Popup) {
+        if (
+            interactionType === InteractionType.Redirect ||
+            interactionType === InteractionType.Popup
+        ) {
             this.preflightInteractiveRequest(setInteractionInProgress);
         }
     }
-    
+
     /**
      * Preflight check for interactive requests
      *
      * @protected
      * @param {boolean} setInteractionInProgress Whether to set interaction in progress temp cache flag
      */
-    protected preflightInteractiveRequest(setInteractionInProgress: boolean): void {
-        this.logger.verbose("preflightInteractiveRequest called, validating app environment");
+    protected preflightInteractiveRequest(
+        setInteractionInProgress: boolean
+    ): void {
+        this.logger.verbose(
+            "preflightInteractiveRequest called, validating app environment"
+        );
         // block the reload if it occurred inside a hidden iframe
         BrowserUtils.blockReloadInHiddenIframes();
 
@@ -803,13 +1251,29 @@ export abstract class ClientApplication {
      * Acquire a token from native device (e.g. WAM)
      * @param request
      */
-    protected async acquireTokenNative(request: PopupRequest|SilentRequest|SsoSilentRequest, apiId: ApiId, accountId?: string): Promise<AuthenticationResult> {
+    protected async acquireTokenNative(
+        request: PopupRequest | SilentRequest | SsoSilentRequest,
+        apiId: ApiId,
+        accountId?: string
+    ): Promise<AuthenticationResult> {
         this.logger.trace("acquireTokenNative called");
         if (!this.nativeExtensionProvider) {
             throw BrowserAuthError.createNativeConnectionNotEstablishedError();
         }
 
-        const nativeClient = new NativeInteractionClient(this.config, this.browserStorage, this.browserCrypto, this.logger, this.eventHandler, this.navigationClient, apiId, this.performanceClient, this.nativeExtensionProvider, accountId || this.getNativeAccountId(request), request.correlationId);
+        const nativeClient = new NativeInteractionClient(
+            this.config,
+            this.browserStorage,
+            this.browserCrypto,
+            this.logger,
+            this.eventHandler,
+            this.navigationClient,
+            apiId,
+            this.performanceClient,
+            this.nativeExtensionProvider,
+            accountId || this.getNativeAccountId(request),
+            request.correlationId
+        );
 
         return nativeClient.acquireToken(request);
     }
@@ -818,10 +1282,22 @@ export abstract class ClientApplication {
      * Returns boolean indicating if this request can use the native broker
      * @param request
      */
-    protected canUseNative(request: RedirectRequest|PopupRequest|SsoSilentRequest, accountId?: string): boolean {
+    protected canUseNative(
+        request: RedirectRequest | PopupRequest | SsoSilentRequest,
+        accountId?: string
+    ): boolean {
         this.logger.trace("canUseNative called");
-        if (!NativeMessageHandler.isNativeAvailable(this.config, this.logger, this.nativeExtensionProvider, request.authenticationScheme)) {
-            this.logger.trace("canUseNative: isNativeAvailable returned false, returning false");
+        if (
+            !NativeMessageHandler.isNativeAvailable(
+                this.config,
+                this.logger,
+                this.nativeExtensionProvider,
+                request.authenticationScheme
+            )
+        ) {
+            this.logger.trace(
+                "canUseNative: isNativeAvailable returned false, returning false"
+            );
             return false;
         }
 
@@ -829,16 +1305,22 @@ export abstract class ClientApplication {
             switch (request.prompt) {
                 case PromptValue.NONE:
                 case PromptValue.CONSENT:
-                    this.logger.trace("canUseNative: prompt is compatible with native flow");
+                    this.logger.trace(
+                        "canUseNative: prompt is compatible with native flow"
+                    );
                     break;
                 default:
-                    this.logger.trace(`canUseNative: prompt = ${request.prompt} is not compatible with native flow, returning false`);
+                    this.logger.trace(
+                        `canUseNative: prompt = ${request.prompt} is not compatible with native flow, returning false`
+                    );
                     return false;
             }
         }
 
         if (!accountId && !this.getNativeAccountId(request)) {
-            this.logger.trace("canUseNative: nativeAccountId is not available, returning false");
+            this.logger.trace(
+                "canUseNative: nativeAccountId is not available, returning false"
+            );
             return false;
         }
 
@@ -850,10 +1332,18 @@ export abstract class ClientApplication {
      * @param request
      * @returns
      */
-    protected getNativeAccountId(request: RedirectRequest|PopupRequest|SsoSilentRequest): string {
-        const account = request.account || this.browserStorage.getAccountInfoByHints(request.loginHint, request.sid) || this.getActiveAccount();
+    protected getNativeAccountId(
+        request: RedirectRequest | PopupRequest | SsoSilentRequest
+    ): string {
+        const account =
+            request.account ||
+            this.browserStorage.getAccountInfoByHints(
+                request.loginHint,
+                request.sid
+            ) ||
+            this.getActiveAccount();
 
-        return account && account.nativeAccountId || "";
+        return (account && account.nativeAccountId) || "";
     }
 
     /**
@@ -861,7 +1351,17 @@ export abstract class ClientApplication {
      * @param correlationId
      */
     protected createPopupClient(correlationId?: string): PopupClient {
-        return new PopupClient(this.config, this.browserStorage, this.browserCrypto, this.logger, this.eventHandler, this.navigationClient, this.performanceClient, this.nativeExtensionProvider, correlationId);
+        return new PopupClient(
+            this.config,
+            this.browserStorage,
+            this.browserCrypto,
+            this.logger,
+            this.eventHandler,
+            this.navigationClient,
+            this.performanceClient,
+            this.nativeExtensionProvider,
+            correlationId
+        );
     }
 
     /**
@@ -869,36 +1369,96 @@ export abstract class ClientApplication {
      * @param correlationId
      */
     protected createRedirectClient(correlationId?: string): RedirectClient {
-        return new RedirectClient(this.config, this.browserStorage, this.browserCrypto, this.logger, this.eventHandler, this.navigationClient, this.performanceClient, this.nativeExtensionProvider, correlationId);
+        return new RedirectClient(
+            this.config,
+            this.browserStorage,
+            this.browserCrypto,
+            this.logger,
+            this.eventHandler,
+            this.navigationClient,
+            this.performanceClient,
+            this.nativeExtensionProvider,
+            correlationId
+        );
     }
 
     /**
      * Returns new instance of the Silent Iframe Interaction Client
      * @param correlationId
      */
-    protected createSilentIframeClient(correlationId?: string): SilentIframeClient {
-        return new SilentIframeClient(this.config, this.browserStorage, this.browserCrypto, this.logger, this.eventHandler, this.navigationClient, ApiId.ssoSilent, this.performanceClient, this.nativeExtensionProvider, correlationId);
+    protected createSilentIframeClient(
+        correlationId?: string
+    ): SilentIframeClient {
+        return new SilentIframeClient(
+            this.config,
+            this.browserStorage,
+            this.browserCrypto,
+            this.logger,
+            this.eventHandler,
+            this.navigationClient,
+            ApiId.ssoSilent,
+            this.performanceClient,
+            this.nativeExtensionProvider,
+            correlationId
+        );
     }
 
     /**
      * Returns new instance of the Silent Cache Interaction Client
      */
-    protected createSilentCacheClient(correlationId?: string): SilentCacheClient {
-        return new SilentCacheClient(this.config, this.browserStorage, this.browserCrypto, this.logger, this.eventHandler, this.navigationClient, this.performanceClient, this.nativeExtensionProvider, correlationId);
+    protected createSilentCacheClient(
+        correlationId?: string
+    ): SilentCacheClient {
+        return new SilentCacheClient(
+            this.config,
+            this.browserStorage,
+            this.browserCrypto,
+            this.logger,
+            this.eventHandler,
+            this.navigationClient,
+            this.performanceClient,
+            this.nativeExtensionProvider,
+            correlationId
+        );
     }
 
     /**
      * Returns new instance of the Silent Refresh Interaction Client
      */
-    protected createSilentRefreshClient(correlationId?: string): SilentRefreshClient {
-        return new SilentRefreshClient(this.config, this.browserStorage, this.browserCrypto, this.logger, this.eventHandler, this.navigationClient, this.performanceClient, this.nativeExtensionProvider, correlationId);
+    protected createSilentRefreshClient(
+        correlationId?: string
+    ): SilentRefreshClient {
+        return new SilentRefreshClient(
+            this.config,
+            this.browserStorage,
+            this.browserCrypto,
+            this.logger,
+            this.eventHandler,
+            this.navigationClient,
+            this.performanceClient,
+            this.nativeExtensionProvider,
+            correlationId
+        );
     }
 
     /**
      * Returns new instance of the Silent AuthCode Interaction Client
      */
-    protected createSilentAuthCodeClient(correlationId?: string): SilentAuthCodeClient {
-        return new SilentAuthCodeClient(this.config, this.browserStorage, this.browserCrypto, this.logger, this.eventHandler, this.navigationClient, ApiId.acquireTokenByCode, this.performanceClient, this.nativeExtensionProvider, correlationId);
+    protected createSilentAuthCodeClient(
+        correlationId?: string
+    ): SilentAuthCodeClient {
+        return new SilentAuthCodeClient(
+            this.config,
+            this.browserStorage,
+            this.browserCrypto,
+            this.logger,
+            this.eventHandler,
+            this.navigationClient,
+            ApiId.acquireTokenByCode,
+            this.performanceClient,
+            this.nativeExtensionProvider,
+            correlationId
+        );
     }
 
     /**
@@ -1005,7 +1565,9 @@ export abstract class ClientApplication {
      * @param {?Partial<BaseAuthRequest>} [request]
      * @returns {string}
      */
-    protected getRequestCorrelationId(request?: Partial<BaseAuthRequest>): string {
+    protected getRequestCorrelationId(
+        request?: Partial<BaseAuthRequest>
+    ): string {
         if (request?.correlationId) {
             return request.correlationId;
         }
@@ -1023,3 +1585,4 @@ export abstract class ClientApplication {
 
     // #endregion
 }
+
