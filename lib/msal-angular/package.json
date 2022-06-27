@@ -37,6 +37,9 @@
       "major"
     ]
   },
+  "overrides": {
+    "@types/prettier": "2.6.0"
+  },
   "devDependencies": {
     "@angular-devkit/build-angular": "~0.1102.11",
     "@angular/animations": "~11.2.12",

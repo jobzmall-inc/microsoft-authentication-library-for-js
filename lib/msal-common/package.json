@@ -48,6 +48,9 @@
     "build:all": "npm run build",
     "prepack": "npm run build"
   },
+  "overrides": {
+      "@types/prettier": "2.6.0"
+  },
   "devDependencies": {
     "@babel/core": "^7.7.2",
     "@babel/plugin-proposal-class-properties": "^7.7.0",

@@ -61,6 +61,9 @@
     "link:localDeps": "npx lerna bootstrap --scope @azure/msal-common --scope @azure/msal-browser",
     "prepack": "npm run build:all"
   },
+   "overrides": {
+       "@types/prettier": "2.6.0"
+   },
   "devDependencies": {
     "@azure/storage-blob": "^12.2.1",
     "@babel/core": "^7.7.2",
